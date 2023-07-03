@@ -3,6 +3,7 @@ import torch
 import cv2
 import numpy as np
 from typing import Union, List, Optional
+# import  skimage.metrics as metrics
 
 
 def read_image(path: Path, grayscale: bool = False) -> np.ndarray:
@@ -82,4 +83,36 @@ def match_pair(extractor, matcher, image0, image1, scales0=None, scales1=None):
     matches0, mscores0 = pred['matches0'], pred['matching_scores0']
     valid = matches0 > -1
     matches = torch.stack([torch.where(valid)[0], matches0[valid]], -1)
+    # m_kpts0, m_kpts1 = pred['keypoints0'][matches[..., 0]], pred['keypoints1'][matches[..., 1]]
     return {**pred, 'matches': matches, 'matching_scores': mscores0[valid]}
+
+def transformation(pt_drone, H):
+    return H @ pt_drone
+
+def coords(mat):
+    a = mat[0][0]/mat[2][0]
+    b = mat[1][0]/mat[2][0]
+    return float(a), float(b)
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-1 * x))
+
+# def ssim_similarity(imgA, imgB):
+#     return metrics.structural_similarity(imgA, imgB, channel_axis = 1)
+
+def draw_matches(img_A, img_B, keypoints0, keypoints1):
+    
+    p1s = []
+    p2s = []
+    dmatches = []
+    for i, (x1, y1) in enumerate(keypoints0):
+
+        p1s.append(cv2.KeyPoint(x1, y1, 1))
+        p2s.append(cv2.KeyPoint(keypoints1[i][0], keypoints1[i][1], 1))
+        j = len(p1s) - 1
+        dmatches.append(cv2.DMatch(j, j, 1))
+
+    matched_images = cv2.drawMatches(cv2.cvtColor(img_A, cv2.COLOR_RGB2BGR), p1s,
+                                     cv2.cvtColor(img_B, cv2.COLOR_RGB2BGR), p2s, dmatches, None)
+
+    return matched_images
