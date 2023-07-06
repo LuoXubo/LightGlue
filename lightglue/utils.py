@@ -2,6 +2,7 @@ from pathlib import Path
 import torch
 import cv2
 import numpy as np
+import math
 from typing import Union, List, Optional
 # import  skimage.metrics as metrics
 
@@ -116,3 +117,20 @@ def draw_matches(img_A, img_B, keypoints0, keypoints1):
                                      cv2.cvtColor(img_B, cv2.COLOR_RGB2BGR), p2s, dmatches, None)
 
     return matched_images
+
+def rotate(image, angle, center=None, scale=1.0): #逆时针旋转
+    (h, w) = image.shape[:2] #2
+    if center is None: #3
+        center = (w // 2, h // 2) #4
+ 
+    M = cv2.getRotationMatrix2D(center, angle, scale) #5
+ 
+    rotated = cv2.warpAffine(image, M, (w, h)) #6
+    return rotated #7
+
+def rotateP(angle,valuex,valuey,pointx,pointy):
+    valuex = np.array(valuex)
+    valuey = np.array(valuey)
+    sRotatex = (valuex-pointx)*math.cos(angle) + (valuey-pointy)*math.sin(angle) + pointx
+    sRotatey = (valuey-pointy)*math.cos(angle) - (valuex-pointx)*math.sin(angle) + pointy
+    return sRotatex,sRotatey

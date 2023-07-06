@@ -68,38 +68,51 @@ for uav_folder in tqdm(uav_folder_list):
 
     best_score = 0
     best_mtch = 0
+    best_rotate = 0
     uav = root_images + '/' + uav_folder + '/' + imgs[10]
     img1 = cv2.imread(uav)
     img_A = np.array(img1)
     tensorA, scalesA = load_image(uav, grayscale=False)
 
-    subimg_candidate = imgs[0:5]
+    subimg_candidate = imgs[0:3]
 
     start = time.time()
     print('Begin to search best sub-satellite imge for uav image: %s ......' % uav_folder)
 
     for satellite_folder in subimg_candidate:  # satellite_folder: Rank01-45_1000_1000.png
         sat = root_images + '/' + uav_folder + '/' + satellite_folder
-        tensorB, scalesB = load_image(sat, grayscale=False)
+        # tensorB, scalesB = load_image(sat, grayscale=False)
+        sat_img = cv2.imread(sat, cv2.IMREAD_COLOR)[...,::-1]
+        sat0 = sat_img
+        sat1 = rotate(sat_img, 90)
+        sat2 = rotate(sat_img, 180)
+        sat3 = rotate(sat_img, 270)
+        sat0 = numpy_image_to_torch(sat0)
+        sat1 = numpy_image_to_torch(sat1)
+        sat2 = numpy_image_to_torch(sat2)
+        sat3 = numpy_image_to_torch(sat3)
 
-        pred = match_pair(extractor, matcher, tensorA, tensorB)
-        kpts0, kpts1, matches = pred['keypoints0'], pred['keypoints1'], pred['matches']
-        m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
+        sats = [sat0, sat1, sat2, sat3]
+        for i in range(4):
+            pred = match_pair(extractor, matcher, tensorA, sats[i])
+            kpts0, kpts1, matches = pred['keypoints0'], pred['keypoints1'], pred['matches']
+            m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
 
-        if(len(m_kpts0) < 4):
-            continue
+            if(len(m_kpts0) < 4):
+                continue
 
-        H, _ = cv2.findHomography(m_kpts0.numpy(), m_kpts1.numpy(), cv2.RANSAC, 5.0)
+            H, _ = cv2.findHomography(m_kpts0.numpy(), m_kpts1.numpy(), cv2.RANSAC, 5.0)
 
-        matching_score = pred['matching_scores'].numpy().mean()
+            matching_score = pred['matching_scores'].numpy().mean()
 
-        if matching_score > best_score:
-            best_kpA = m_kpts0.numpy()
-            best_kpB = m_kpts1.numpy()
-            best_mtch = len(matches)
-            best_score = matching_score
-            best_sub = satellite_folder
-            best_H = H
+            if matching_score > best_score:
+                best_kpA = m_kpts0.numpy()
+                best_kpB = m_kpts1.numpy()
+                best_mtch = len(matches)
+                best_score = matching_score
+                best_sub = satellite_folder
+                best_H = H
+                best_rotate = i*90
 
     # print(best_H is None)
 
@@ -112,6 +125,7 @@ for uav_folder in tqdm(uav_folder_list):
     if best_H is not None:
         pt_sate = transformation(pt_drone.T, best_H)
     x, y = coords(pt_sate)
+    x, y = rotateP(math.radians(best_rotate), x, y, 250, 250)
     # resX, resY = float(startX) + coords(pt_sate)[0], float(startY) + coords(pt_sate)[1]
     resX, resY = float(startX) + x, float(startY) + y
         
@@ -151,8 +165,8 @@ for uav_folder in tqdm(uav_folder_list):
         timestamp, resX, resY, best_mtch, best_score, (end-start)))
     
     with open('log.txt', 'a+') as logfile:
-        logfile.write('Timestamp: %s        Position:{%f, %f}       matching points: %d     matchability:%f     timecost:%f s       best sat:%s\n' % (
-        timestamp, resX, resY, best_mtch, best_score, (end-start), best_sub))
+        logfile.write('Timestamp: %s        Position:{%f, %f}       matching points: %d     matchability:%f     timecost:%f s       best sat:%s     best rotate:%d\n' % (
+        timestamp, resX, resY, best_mtch, best_score, (end-start), best_sub, best_rotate))
 pose.timestamp = '-1'
 msg = pose.SerializeToString()
 conn.publish(channel, msg)
