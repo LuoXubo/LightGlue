@@ -9,6 +9,8 @@
 @License :   (C)Copyright 2017-2018, Liugroup-NLPR-CASIA
 @Desc    :   Batch localization
 '''
+
+
 import os
 import time
 from pathlib import Path
@@ -20,12 +22,15 @@ import torch
 import math
 from tqdm import tqdm
 
+import rospy
+from nav_msgs.msg import Odometry
+
 import pose_pb2
 from lightglue import LightGlue, SuperPoint, viz2d
 from lightglue.utils import (coords, draw_matches, load_image, match_pair,
                              sigmoid, transformation, numpy_image_to_torch, rotate, rotateP)
 
-### init
+
 root_dataset = '/home/zino/lxb/Image-Matching-codes/datasets/Mars9/'
 res_XY = root_dataset + 'uav/res_lightglue.txt'
 gt_XY = root_dataset + 'uav/gt.txt'
@@ -36,9 +41,6 @@ abs_path = root_dataset + 'uav/abs.txt'
 channel = 'g2l'
 pose = pose_pb2.poseInfo()
 conn = redis.Redis(host='127.0.0.1', port=6379)
-
-
-
 
 extractor = SuperPoint(max_num_keypoints=2048,
                        nms_radius=3).eval().cuda()  # load the extractor
@@ -52,6 +54,9 @@ central_coords_x = 500
 central_coords_y = 500
 pt_drone = np.matrix([int(central_coords_x/2), int(central_coords_y/2), 1])
 
+
+
+
 uav_folder_list = os.listdir(root_images)
 uav_folder_list.sort()
 
@@ -60,6 +65,7 @@ with open(gt_XY, 'r') as f:
 f.close()
 
 cnt = 0
+ts = 0.0
 for uav_folder in tqdm(uav_folder_list):
     imgs = os.listdir(root_images + uav_folder)
     imgs.sort()
@@ -135,7 +141,7 @@ for uav_folder in tqdm(uav_folder_list):
     pose.qz = float(qz)
     pose.conf = float(best_score)
     pose.image_data = open(uav, 'rb').read()
-
+    ts += 0.1
     if best_H is None:
         pose.conf = 0.0
 

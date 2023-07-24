@@ -1,2 +1,2 @@
 rm -f log.txt
-python estimate.py
+python estimate_rotate.py

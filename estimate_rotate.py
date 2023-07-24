@@ -7,7 +7,7 @@
 @Version :   1.0
 @Contact :   luoxubo@hotmail.com
 @License :   (C)Copyright 2017-2018, Liugroup-NLPR-CASIA
-@Desc    :   Batch localization
+@Desc    :   Batch localization. 增加对旋转180度后的图像的比较
 '''
 
 
@@ -70,11 +70,11 @@ for uav_folder in tqdm(uav_folder_list):
     best_mtch = 0
     best_rotate = 0
     uav = root_images + '/' + uav_folder + '/' + imgs[10]
-    img1 = cv2.imread(uav)
-    img_A = np.array(img1)
+    # img1 = cv2.imread(uav)
+    # img_A = np.array(img1)
     tensorA, scalesA = load_image(uav, grayscale=False)
 
-    subimg_candidate = imgs[0:3]
+    subimg_candidate = imgs[0:5]
 
     start = time.time()
     print('Begin to search best sub-satellite imge for uav image: %s ......' % uav_folder)
@@ -84,16 +84,13 @@ for uav_folder in tqdm(uav_folder_list):
         # tensorB, scalesB = load_image(sat, grayscale=False)
         sat_img = cv2.imread(sat, cv2.IMREAD_COLOR)[...,::-1]
         sat0 = sat_img
-        sat1 = rotate(sat_img, 90)
-        sat2 = rotate(sat_img, 180)
-        sat3 = rotate(sat_img, 270)
-        sat0 = numpy_image_to_torch(sat0)
-        sat1 = numpy_image_to_torch(sat1)
-        sat2 = numpy_image_to_torch(sat2)
-        sat3 = numpy_image_to_torch(sat3)
+        sat1 = rotate(sat_img, 180)
 
-        sats = [sat0, sat1, sat2, sat3]
-        for i in range(4):
+        
+
+        sats = [sat0, sat1]
+        for i in range(2):
+            sats[i] = numpy_image_to_torch(sats[i])
             pred = match_pair(extractor, matcher, tensorA, sats[i])
             kpts0, kpts1, matches = pred['keypoints0'], pred['keypoints1'], pred['matches']
             m_kpts0, m_kpts1 = kpts0[matches[..., 0]], kpts1[matches[..., 1]]
@@ -112,7 +109,7 @@ for uav_folder in tqdm(uav_folder_list):
                 best_score = matching_score
                 best_sub = satellite_folder
                 best_H = H
-                best_rotate = i*90
+                best_rotate = i*180
 
     # print(best_H is None)
 
@@ -125,21 +122,12 @@ for uav_folder in tqdm(uav_folder_list):
     if best_H is not None:
         pt_sate = transformation(pt_drone.T, best_H)
     x, y = coords(pt_sate)
-    x, y = rotateP(math.radians(best_rotate), x, y, 250, 250)
+    # x, y = rotateP(math.radians(best_rotate), x, y, 250, 250)
+    if best_rotate != 0:
+        x, y = 500-x, 500-y
     # resX, resY = float(startX) + coords(pt_sate)[0], float(startY) + coords(pt_sate)[1]
     resX, resY = float(startX) + x, float(startY) + y
         
-    # if best_H is not None:
-    #     im2 = cv2.imread(root_images + '/'  + uav_folder + '/' + best_sub)
-    #     img_B = np.array(im2)
-
-    #     warped_uav_img = cv2.warpPerspective(img_A, best_H, (img_B.shape[0], img_B.shape[1]))
-    #     added_img = cv2.addWeighted(warped_uav_img, 0.7, img_B, 0.3, 0)
-
-    #     cv2.imwrite(save_path + uav_folder + '.png', added_img)
-
-    #     cv2.imwrite(save_path + uav_folder + '_matches.png', draw_matches(img_A, img_B, best_kpA, best_kpB))
-
     pose.timestamp = timestamp
     pose.x = resX
     pose.y = resY

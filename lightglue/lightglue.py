@@ -6,6 +6,7 @@ from torch import nn
 import torch.nn.functional as F
 from einops import rearrange, repeat
 from typing import Optional, List, Callable
+import math
 
 try:
     from flash_attn.modules.mha import FlashCrossAttention
@@ -332,7 +333,8 @@ class LightGlue(nn.Module):
             matches1: [B x N], matching_scores1: [B x N]
             log_assignment: [B x M+1 x N+1]
         """
-        with torch.autocast(enabled=self.conf.mp, device_type='cuda'):
+        with torch.cuda.amp.autocast(enabled=self.conf.mp):
+        # with torch.autocast(enabled=self.conf.mp, device_type='cuda'):
             return self._forward(data)
 
     def _forward(self, data: dict) -> dict:
@@ -402,10 +404,11 @@ class LightGlue(nn.Module):
             scores_, _ = self.log_assignment[i](desc0, desc1)
             dt, dev = scores_.dtype, scores_.device
             scores = torch.zeros(b, m+1, n+1, dtype=dt, device=dev)
-            scores[:, :-1, :-1] = -torch.inf
+            scores[:, :-1, :-1] = -math.inf
             scores[:, ind0[0], -1] = scores_[:, :-1, -1]
             scores[:, -1, ind1[0]] = scores_[:, -1, :-1]
-            x, y = torch.meshgrid(ind0[0], ind1[0], indexing='ij')
+            x, y = torch.meshgrid(ind0[0], ind1[0])
+            # x, y = torch.meshgrid(ind0[0], ind1[0], indexing='ij')
             scores[:, x, y] = scores_[:, :-1, :-1]
         else:
             scores, _ = self.log_assignment[i](desc0, desc1)
